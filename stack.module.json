@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "jellyfin",
+  "repo": "jellyfin-stack-module",
+  "runtimeId": "jellyfin",
+  "lifecycle": "active",
+  "dependencies": [
+    "stack-foundation"
+  ],
+  "overlays": [
+    "stack.compose/jellyfin.yml",
+    "stack.config/jellyfin"
+  ]
+}
