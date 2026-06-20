@@ -41,4 +41,14 @@ services:
 
 volumes:
   jellyfin_config:
+    driver: local
+    driver_opts:
+      type: bind
+      o: bind
+      device: ${STACK_VOLUME_ROOT}/jellyfin_config
   jellyfin_cache:
+    driver: local
+    driver_opts:
+      type: bind
+      o: bind
+      device: ${STACK_VOLUME_ROOT}/jellyfin_cache
