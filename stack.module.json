@@ -17,7 +17,9 @@
   "smokeUnsupportedReason": "requires generated bundle context, deployed networking, secrets, or service dependencies",
   "overlays": [
     "stack.compose/jellyfin.yml",
-    "stack.config/jellyfin"
+    "stack.config/jellyfin",
+    "stack.containers/test-runner/playwright-tests/tests/deep/oidc/jellyfin.spec.ts",
+    "stack.containers/test-runner/playwright-tests/tests/deep/oidc/jellyfin-external-api.spec.ts"
   ],
   "testAssets": []
 }
