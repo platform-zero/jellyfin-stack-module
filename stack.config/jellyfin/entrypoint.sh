@@ -200,6 +200,66 @@ configure_hardware_acceleration() {
     sed -i "/<HardwareDecodingCodecs>/,/<\\/HardwareDecodingCodecs>/c\\  <HardwareDecodingCodecs>\\n${codec_xml}  </HardwareDecodingCodecs>" "$encoding_config"
 }
 
+bootstrap_default_media_library() {
+    local database="/config/data/jellyfin.db"
+    local api_name="${JELLYFIN_BOOTSTRAP_API_KEY_NAME:-webservices-bootstrap}"
+    local token="${JELLYFIN_BOOTSTRAP_API_KEY:-}"
+    local library_name="${JELLYFIN_DEFAULT_LIBRARY_NAME:-Stack Media}"
+    local library_path="${JELLYFIN_DEFAULT_LIBRARY_PATH:-/media}"
+    local collection_type="${JELLYFIN_DEFAULT_LIBRARY_TYPE:-mixed}"
+    local now status
+
+    if [ "${JELLYFIN_BOOTSTRAP_DEFAULT_LIBRARY:-true}" != "true" ]; then
+        return 0
+    fi
+    if ! command -v sqlite3 >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
+        echo "sqlite3 or curl unavailable; skipping Jellyfin default library bootstrap" >&2
+        return 0
+    fi
+
+    for _ in $(seq 1 120); do
+        if [ -s "$database" ] && curl -fsS http://127.0.0.1:8096/System/Info/Public >/dev/null 2>&1; then
+            break
+        fi
+        sleep 2
+    done
+
+    if [ ! -s "$database" ]; then
+        echo "Jellyfin database is not ready; skipping default library bootstrap" >&2
+        return 0
+    fi
+
+    token="${token:-$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 48)}"
+    now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    sqlite3 "$database" <<SQL
+INSERT INTO ApiKeys (DateCreated, DateLastActivity, Name, AccessToken)
+SELECT '$now', '$now', '$api_name', '$token'
+WHERE NOT EXISTS (SELECT 1 FROM ApiKeys WHERE Name = '$api_name');
+SQL
+    token="$(sqlite3 "$database" "SELECT AccessToken FROM ApiKeys WHERE Name = '$api_name' LIMIT 1;")"
+
+    if curl -fsS -H "X-Emby-Token: $token" http://127.0.0.1:8096/Library/VirtualFolders \
+        | grep -F "\"Name\":\"$library_name\"" >/dev/null 2>&1; then
+        echo "Jellyfin default library '$library_name' already exists"
+        return 0
+    fi
+
+    status="$(
+        curl -sS -o /tmp/jellyfin-add-library.out -w '%{http_code}' \
+            -X POST \
+            -H "X-Emby-Token: $token" \
+            -H "Content-Type: application/json" \
+            "http://127.0.0.1:8096/Library/VirtualFolders?name=$(printf '%s' "$library_name" | sed 's/ /%20/g')&collectionType=$collection_type&paths=$library_path&refreshLibrary=false" \
+            -d '{"LibraryOptions":{"Enabled":true,"EnablePhotos":true,"EnableRealtimeMonitor":false,"EnableInternetProviders":false}}' \
+            || true
+    )"
+    if [ "$status" = "204" ]; then
+        echo "Jellyfin default library '$library_name' points at $library_path"
+    else
+        echo "Jellyfin default library bootstrap returned HTTP $status: $(cat /tmp/jellyfin-add-library.out 2>/dev/null || true)" >&2
+    fi
+}
+
 render_branding() {
     : "${DOMAIN:?ERROR: DOMAIN not set}"
 
@@ -245,6 +305,7 @@ promote_configured_admin_users
 configure_playback_policy
 configure_hardware_acceleration
 render_branding
+bootstrap_default_media_library &
 
 mkdir -p /config/plugins/configurations
 mkdir -p /config/data

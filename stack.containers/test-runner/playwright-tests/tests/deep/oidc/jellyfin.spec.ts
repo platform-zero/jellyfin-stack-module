@@ -10,6 +10,8 @@ import { KeycloakLoginPage } from '../../../pages/KeycloakLoginPage';
 import { defaultIdentityProvider } from '../../../utils/identity-provider';
 import { serviceUrl } from '../../../utils/stack-urls';
 
+const moduleScreenshotRoot = path.join(screenshotRoot, 'jellyfin');
+
 type JellyfinSession = {
   accessToken: string;
   userId: string;
@@ -402,8 +404,8 @@ test('Jellyfin - OIDC login streams Simpsons video with visible frames', async (
   await openEpisodeAndStartPlayback(page, episode, session);
   const metrics = await waitForVisibleVideo(page);
 
-  fs.mkdirSync(screenshotRoot, { recursive: true });
-  fs.writeFileSync(path.join(screenshotRoot, 'jellyfin-video-playback.jpg'), await captureVideoFrame(page));
+  fs.mkdirSync(moduleScreenshotRoot, { recursive: true });
+  fs.writeFileSync(path.join(moduleScreenshotRoot, 'jellyfin-video-playback.jpg'), await captureVideoFrame(page));
 
   expect(metrics.videoWidth, 'Jellyfin video element should expose decoded frame width').toBeGreaterThan(0);
   expect(metrics.videoHeight, 'Jellyfin video element should expose decoded frame height').toBeGreaterThan(0);
