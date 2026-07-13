@@ -1,4 +1,4 @@
-FROM jellyfin/jellyfin@sha256:1694ff069f0c9dafb283c36765175606866769f5d72f2ed56b6a0f1be922fc37
+FROM docker.io/jellyfin/jellyfin@sha256:1694ff069f0c9dafb283c36765175606866769f5d72f2ed56b6a0f1be922fc37
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl sqlite3 unzip && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /config-templates /opt/jellyfin-plugins/sso-authentication_4.0.0.4 \

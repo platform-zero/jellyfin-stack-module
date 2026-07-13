@@ -20,7 +20,8 @@
     "stack.config/jellyfin",
     "stack.containers/test-runner/playwright-tests/tests/deep/oidc/jellyfin.spec.ts",
     "stack.containers/test-runner/playwright-tests/tests/deep/oidc/jellyfin-external-api.spec.ts",
-    "stack.kotlin/test-runner/src/test/kotlin/org/webservices/testrunner/JellyfinConfigTest.kt"
+    "stack.kotlin/test-runner/src/test/kotlin/org/webservices/testrunner/JellyfinConfigTest.kt",
+    "stack.runtime.yaml"
   ],
   "testAssets": []
 }
