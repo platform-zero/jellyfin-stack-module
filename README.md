@@ -6,7 +6,7 @@
 - Lifecycle: `active`
 
 ## Owned overlays
-- `stack.compose/jellyfin.yml`
+- `stack.runtime.yaml`
 - `stack.config/jellyfin`
 
 ## Dependencies
