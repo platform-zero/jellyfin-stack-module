@@ -7,7 +7,7 @@ services:
     image: "localhost/webservices/jellyfin:bundle"
     build:
       context: "."
-      containerfile: "./stack.config/jellyfin/Dockerfile"
+      containerfile: "./stack.config/jellyfin/Containerfile"
     containerName: "jellyfin"
     lifecycle: "daemon"
     updatePolicy: "pinned"

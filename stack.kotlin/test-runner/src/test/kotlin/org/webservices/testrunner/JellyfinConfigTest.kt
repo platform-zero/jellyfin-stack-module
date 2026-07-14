@@ -33,8 +33,8 @@ class JellyfinConfigTest {
 
     @Test
     fun `jellyfin reconciles configured stack admin users`() {
-        val dockerfile = repoFileText("stack.config/jellyfin/Dockerfile")
-        val compose = repoFileText("stack.compose/jellyfin.yml")
+        val dockerfile = repoFileText("stack.config/jellyfin/Containerfile")
+        val compose = repoFileText("stack.runtime.yaml")
         val entrypoint = repoFileText("stack.config/jellyfin/entrypoint.sh")
 
         assertTrue(dockerfile.contains("sqlite3"))
@@ -60,10 +60,10 @@ class JellyfinConfigTest {
 
     @Test
     fun `jellyfin keeps native playback defaults unless compatibility mode is enabled`() {
-        val compose = repoFileText("stack.compose/jellyfin.yml")
+        val compose = repoFileText("stack.runtime.yaml")
         val entrypoint = repoFileText("stack.config/jellyfin/entrypoint.sh")
         val wrapper = repoFileText("stack.config/jellyfin/ffmpeg-websafe.sh")
-        val dockerfile = repoFileText("stack.config/jellyfin/Dockerfile")
+        val dockerfile = repoFileText("stack.config/jellyfin/Containerfile")
 
         assertFalse(compose.contains("JELLYFIN_DISABLE_BROWSER_HEVC_DIRECT_PLAY"))
         assertTrue(dockerfile.contains("ln -sf /usr/lib/jellyfin-ffmpeg/ffprobe /usr/local/bin/ffprobe"))
@@ -100,12 +100,12 @@ class JellyfinConfigTest {
     @Test
     fun `jellyfin route keeps sso boundary without playback rewriting sidecar`() {
         val caddyfile = repoFileText("stack.config/caddy/Caddyfile")
-        val compose = repoFileText("stack.compose/jellyfin.yml")
+        val compose = repoFileText("stack.runtime.yaml")
         val deploy = repoFileText("scripts/deploy.sh")
         val graph = repoFileText("stack.systemd/graph.json")
 
         assertFalse(compose.contains("jellyfin-profile-proxy:"))
-        assertFalse(compose.contains("dockerfile: ./stack.containers/jellyfin-profile-proxy/Dockerfile"))
+        assertFalse(compose.contains("containerfile: ./stack.containers/jellyfin-profile-proxy/Containerfile"))
         assertFalse(compose.contains("JELLYFIN_UPSTREAM_HOST: jellyfin"))
         assertTrue(graph.contains("\"jellyfin-profile-proxy\""))
         assertFalse(deploy.contains("webservices-jellyfin-profile-proxy.service"))
