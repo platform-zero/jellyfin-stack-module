@@ -87,7 +87,7 @@ async function extractJellyfinSession(page: Page): Promise<JellyfinSession> {
     return null;
   });
 
-  expect(session, 'Jellyfin should persist an authenticated API token after external-route SSO').toBeTruthy();
+  expect(session, 'Jellyfin should persist an authenticated API token after external-route SSO').not.toBeNull();
   return session!;
 }
 
@@ -114,7 +114,7 @@ test('Jellyfin external Caddy route exposes native-client discovery without edge
     maxRedirects: 0,
   });
 
-  expect(response.ok(), 'Jellyfin native clients require public server discovery through the external route').toBeTruthy();
+  expect(response.status(), 'Jellyfin native clients require public server discovery through the external route').toBe(200);
   const payload = await response.json() as { ProductName?: string; StartupWizardCompleted?: boolean };
   expect(payload.ProductName).toBe('Jellyfin Server');
   expect(payload.StartupWizardCompleted).toBe(true);
@@ -154,18 +154,16 @@ test('Jellyfin external Caddy route supports SSO app and authenticated API acces
 
   const session = await extractJellyfinSession(page);
   const userResponse = await fetchJellyfinApi(page, session, `/Users/${encodeURIComponent(session.userId)}`);
-  expect(userResponse.ok, `Jellyfin authenticated user API failed (${userResponse.status} ${userResponse.statusText})`)
-    .toBeTruthy();
+  expect(userResponse.status, `Jellyfin authenticated user API failed (${userResponse.statusText})`).toBe(200);
 
   const itemResponse = await fetchJellyfinApi(
     page,
     session,
     `/Users/${encodeURIComponent(session.userId)}/Items?Limit=1`
   );
-  expect(itemResponse.ok, `Jellyfin authenticated item API failed (${itemResponse.status} ${itemResponse.statusText})`)
-    .toBeTruthy();
+  expect(itemResponse.status, `Jellyfin authenticated item API failed (${itemResponse.statusText})`).toBe(200);
 
   const userPayload = JSON.parse(userResponse.text) as { Id?: string; Name?: string };
   expect(userPayload.Id).toBe(session.userId);
-  expect(userPayload.Name, 'Jellyfin authenticated API should return the SSO-created user').toBeTruthy();
+  expect(userPayload.Name, 'Jellyfin authenticated API should return the SSO-created user').toMatch(/\S/);
 });

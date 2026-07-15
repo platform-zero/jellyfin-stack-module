@@ -121,7 +121,7 @@ async function extractJellyfinSession(page: Page): Promise<JellyfinSession> {
     return null;
   });
 
-  expect(session, 'Jellyfin should persist an authenticated API token after OIDC login').toBeTruthy();
+  expect(session, 'Jellyfin should persist an authenticated API token after OIDC login').not.toBeNull();
   return session!;
 }
 
@@ -175,7 +175,7 @@ async function findSimpsonsEpisode(page: Page, session: JellyfinSession): Promis
   }, session);
 
   if ('error' in episode) {
-    test.skip(true, `${episode.error}. Skipping playback probe because fixture media is not visible to this Jellyfin user.`);
+    throw new Error(`${episode.error}. The required playback fixture must be visible to the managed Jellyfin test user.`);
   }
   return episode as JellyfinEpisode;
 }
@@ -336,7 +336,7 @@ async function waitForVisibleVideo(page: Page): Promise<VideoFrameMetrics> {
   }, {
     message: 'Jellyfin playback should render non-black, colorful video frames',
     timeout: 60000,
-  }).toBeTruthy();
+  }).toBe(true);
 
   return latestMetrics;
 }
