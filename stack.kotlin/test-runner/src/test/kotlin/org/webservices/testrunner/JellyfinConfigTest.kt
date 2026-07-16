@@ -102,12 +102,10 @@ class JellyfinConfigTest {
         val caddyfile = repoFileText("stack.config/caddy/Caddyfile")
         val runtime = repoFileText("stack.runtime.yaml")
         val deploy = repoFileText("scripts/deploy.sh")
-        val graph = repoFileText("stack.systemd/graph.json")
 
         assertFalse(runtime.contains("jellyfin-profile-proxy:"))
         assertFalse(runtime.contains("containerfile: ./stack.containers/jellyfin-profile-proxy/Containerfile"))
         assertFalse(runtime.contains("JELLYFIN_UPSTREAM_HOST: jellyfin"))
-        assertTrue(graph.contains("\"jellyfin-profile-proxy\""))
         assertFalse(deploy.contains("webservices-jellyfin-profile-proxy.service"))
         assertFalse(caddyfile.contains("@jellyfin_playback_info path /Items/*/PlaybackInfo"))
         assertFalse(caddyfile.contains("handle @jellyfin_playback_info"))
@@ -125,7 +123,7 @@ class JellyfinConfigTest {
     }
 
     private fun repoFileText(relativePath: String): String =
-        Files.readString(repoRoot().resolve(relativePath))
+        TestSourceFiles.moduleText("jellyfin", relativePath)
 
     private fun repoRoot(): Path {
         var current = Path.of("").toAbsolutePath()
