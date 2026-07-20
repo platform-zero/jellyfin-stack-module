@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "exceptions": [
+    {
+      "rule": "container-root-default",
+      "path": "stack.config/jellyfin/Containerfile",
+      "reason": "The entrypoint installs local certificate trust and initializes Jellyfin configuration before starting the server.",
+      "mitigations": [
+        "The service runs in a dedicated rootful placement with constrained mounts.",
+        "Only reviewed bootstrap scripts are included in the immutable image."
+      ]
+    }
+  ]
+}
