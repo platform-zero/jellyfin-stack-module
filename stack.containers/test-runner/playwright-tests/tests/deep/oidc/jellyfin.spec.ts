@@ -478,7 +478,8 @@ test('Jellyfin - OIDC login streams Simpsons video with visible frames', async (
   const metrics = await waitForVisibleVideo(page).catch(async (error) => {
     // Never include token-bearing URLs, headers, session IDs or media paths.
     console.log(JSON.stringify({ jellyfinPlaybackDiagnostics: playbackDiagnostics,
-      managedPlaybackInfo, playbackRequests, playbackInfoRequests, failedRequests,
+      managedPlaybackInfo, serverIdPresent: Boolean(session.serverId),
+      playbackRequests, playbackInfoRequests, failedRequests,
       playerErrorVisible: await page.getByRole('heading', { name: 'Playback Error' }).isVisible().catch(() => false),
       noMediaSourceVisible: await page.getByText('Unable to find a valid media source to play.').isVisible().catch(() => false),
     }));
