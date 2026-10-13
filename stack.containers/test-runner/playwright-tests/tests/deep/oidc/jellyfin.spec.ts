@@ -451,11 +451,27 @@ test('Jellyfin - OIDC login streams Simpsons video with visible frames', async (
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
   const episode = await findSimpsonsEpisode(page, session);
+  const managedPlaybackInfo = await page.evaluate(async ({ id, accessToken }) => {
+    try {
+      const response = await fetch(`/Items/${encodeURIComponent(id)}/PlaybackInfo`, {
+        credentials: 'include', headers: { 'X-Emby-Token': accessToken, Accept: 'application/json' },
+      });
+      if (!response.ok) return { status: response.status, sourceCount: null };
+      const result = await response.json() as { MediaSources?: Array<{
+        SupportsDirectPlay?: boolean; SupportsDirectStream?: boolean; SupportsTranscoding?: boolean;
+      }> };
+      return { status: response.status, sourceCount: result.MediaSources?.length ?? null,
+        sources: (result.MediaSources ?? []).slice(0, 5).map(source => ({
+          direct: source.SupportsDirectPlay === true, stream: source.SupportsDirectStream === true,
+          transcode: source.SupportsTranscoding === true,
+        })) };
+    } catch { return { status: null, sourceCount: null }; }
+  }, { id: episode.id, accessToken: session.accessToken });
   await openEpisodeAndStartPlayback(page, episode, session);
   const metrics = await waitForVisibleVideo(page).catch(async (error) => {
     // Never include token-bearing URLs, headers, session IDs or media paths.
     console.log(JSON.stringify({ jellyfinPlaybackDiagnostics: playbackDiagnostics,
-      playbackRequests, playbackInfoRequests, failedRequests,
+      managedPlaybackInfo, playbackRequests, playbackInfoRequests, failedRequests,
       playerErrorVisible: await page.getByRole('heading', { name: 'Playback Error' }).isVisible().catch(() => false),
       noMediaSourceVisible: await page.getByText('Unable to find a valid media source to play.').isVisible().catch(() => false),
     }));
