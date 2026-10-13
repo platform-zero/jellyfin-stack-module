@@ -365,10 +365,34 @@ async function captureVideoFrame(page: Page): Promise<Buffer> {
 test('Jellyfin - OIDC login streams Simpsons video with visible frames', async ({ page }) => {
   test.setTimeout(240000);
   const playbackDiagnostics: Array<Record<string, unknown>> = [];
+  let playbackRequests = 0;
+  let playbackInfoRequests = 0;
+  let failedRequests = 0;
+  page.on('request', (request) => {
+    // Count only operation classes; never record URLs, tokens, IDs or media paths.
+    const pathname = new URL(request.url()).pathname;
+    if (/\/PlaybackInfo\/?$/i.test(pathname)) playbackInfoRequests++;
+    if (/\/Videos\/|\/PlaybackInfo\/?$|\/Audio\//i.test(pathname)) playbackRequests++;
+  });
+  page.on('requestfailed', (request) => {
+    failedRequests++;
+    if (playbackDiagnostics.length >= 20) return;
+    const failure = request.failure()?.errorText ?? '';
+    playbackDiagnostics.push({ operation: 'failed-request',
+      certificateError: /CERT|certificate/i.test(failure),
+      connectionError: /CONNECTION|NAME_NOT_RESOLVED|TIMED_OUT/i.test(failure),
+      aborted: /ABORTED/i.test(failure) });
+  });
+  page.on('pageerror', (error) => {
+    if (playbackDiagnostics.length >= 20) return;
+    playbackDiagnostics.push({ operation: 'page-error',
+      fetchError: /fetch|network/i.test(error.message),
+      mediaSourceError: /media source/i.test(error.message) });
+  });
   page.on('response', async (response) => {
     const pathname = new URL(response.url()).pathname;
     if (playbackDiagnostics.length >= 20) return;
-    if (pathname.endsWith('/PlaybackInfo')) {
+    if (/\/PlaybackInfo\/?$/i.test(pathname)) {
       try {
         const payload = await response.json();
         const allowedErrors = new Set(['NotAllowed', 'NoCompatibleStream', 'RateLimitExceeded']);
@@ -428,9 +452,13 @@ test('Jellyfin - OIDC login streams Simpsons video with visible frames', async (
   await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
   const episode = await findSimpsonsEpisode(page, session);
   await openEpisodeAndStartPlayback(page, episode, session);
-  const metrics = await waitForVisibleVideo(page).catch((error) => {
+  const metrics = await waitForVisibleVideo(page).catch(async (error) => {
     // Never include token-bearing URLs, headers, session IDs or media paths.
-    console.log(JSON.stringify({ jellyfinPlaybackDiagnostics: playbackDiagnostics }));
+    console.log(JSON.stringify({ jellyfinPlaybackDiagnostics: playbackDiagnostics,
+      playbackRequests, playbackInfoRequests, failedRequests,
+      playerErrorVisible: await page.getByRole('heading', { name: 'Playback Error' }).isVisible().catch(() => false),
+      noMediaSourceVisible: await page.getByText('Unable to find a valid media source to play.').isVisible().catch(() => false),
+    }));
     throw error;
   });
 
