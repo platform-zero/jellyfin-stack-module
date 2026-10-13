@@ -364,6 +364,32 @@ async function captureVideoFrame(page: Page): Promise<Buffer> {
 
 test('Jellyfin - OIDC login streams Simpsons video with visible frames', async ({ page }) => {
   test.setTimeout(240000);
+  const playbackDiagnostics: Array<Record<string, unknown>> = [];
+  page.on('response', async (response) => {
+    const pathname = new URL(response.url()).pathname;
+    if (playbackDiagnostics.length >= 20) return;
+    if (pathname.endsWith('/PlaybackInfo')) {
+      try {
+        const payload = await response.json();
+        const allowedErrors = new Set(['NotAllowed', 'NoCompatibleStream', 'RateLimitExceeded']);
+        playbackDiagnostics.push({
+          operation: 'playback-info', status: response.status(),
+          errorCode: typeof payload.ErrorCode === 'number' ? payload.ErrorCode
+            : allowedErrors.has(payload.ErrorCode) ? payload.ErrorCode : null,
+          sourceCount: Array.isArray(payload.MediaSources) ? payload.MediaSources.length : null,
+          sources: Array.isArray(payload.MediaSources) ? payload.MediaSources.slice(0, 5).map((source: any) => ({
+            direct: source.SupportsDirectPlay === true, stream: source.SupportsDirectStream === true,
+            transcode: source.SupportsTranscoding === true,
+            transcodingUrlPresent: typeof source.TranscodingUrl === 'string',
+          })) : [],
+        });
+      } catch {
+        playbackDiagnostics.push({ operation: 'playback-info', status: response.status(), json: false });
+      }
+    } else if (/\/Videos\//i.test(pathname)) {
+      playbackDiagnostics.push({ operation: 'video-transport', status: response.status() });
+    }
+  });
 
   await page.goto(serviceUrl('jellyfin', '/sso/OID/start/keycloak'), {
     waitUntil: 'domcontentloaded',
@@ -402,7 +428,11 @@ test('Jellyfin - OIDC login streams Simpsons video with visible frames', async (
   await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
   const episode = await findSimpsonsEpisode(page, session);
   await openEpisodeAndStartPlayback(page, episode, session);
-  const metrics = await waitForVisibleVideo(page);
+  const metrics = await waitForVisibleVideo(page).catch((error) => {
+    // Never include token-bearing URLs, headers, session IDs or media paths.
+    console.log(JSON.stringify({ jellyfinPlaybackDiagnostics: playbackDiagnostics }));
+    throw error;
+  });
 
   fs.mkdirSync(moduleScreenshotRoot, { recursive: true });
   fs.writeFileSync(path.join(moduleScreenshotRoot, 'jellyfin-video-playback.jpg'), await captureVideoFrame(page));
