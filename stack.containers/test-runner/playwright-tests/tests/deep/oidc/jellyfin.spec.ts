@@ -385,9 +385,16 @@ test('Jellyfin - OIDC login streams Simpsons video with visible frames', async (
   });
   page.on('pageerror', (error) => {
     if (playbackDiagnostics.length >= 20) return;
+    const detail = error.message;
     playbackDiagnostics.push({ operation: 'page-error',
-      fetchError: /fetch|network/i.test(error.message),
-      mediaSourceError: /media source/i.test(error.message) });
+      typeError: error.name === 'TypeError', referenceError: error.name === 'ReferenceError',
+      unsupportedError: error.name === 'NotSupportedError',
+      missingProperty: /cannot read properties|undefined is not an object/i.test(detail),
+      missingMethod: /is not a function/i.test(detail),
+      fetchError: /fetch|network/i.test(detail),
+      mediaSourceError: /media source/i.test(detail),
+      playbackError: /playback|player/i.test(detail),
+    });
   });
   page.on('response', async (response) => {
     const pathname = new URL(response.url()).pathname;
