@@ -185,7 +185,20 @@ async function openEpisodeAndStartPlayback(
   episode: JellyfinEpisode,
   session: JellyfinSession
 ): Promise<void> {
-  const detailsUrl = `${jellyfinBaseUrl}web/#/details?id=${encodeURIComponent(episode.id)}${session.serverId ? `&serverId=${encodeURIComponent(session.serverId)}` : ''}`;
+  // Jellyfin's details route requires the server identity even when the
+  // authenticated session record does not persist it. Read it from the same
+  // strict-TLS Jellyfin origin, not from a fixture or a guessed identifier.
+  let serverId = session.serverId;
+  if (!serverId) {
+    const serverInfo = await page.evaluate(async () => {
+      const response = await fetch('/System/Info/Public', { credentials: 'include' });
+      if (!response.ok) return null;
+      return (await response.json() as { Id?: unknown }).Id;
+    });
+    serverId = typeof serverInfo === 'string' ? serverInfo : undefined;
+  }
+  expect(serverId, 'Jellyfin details must bind the native server').toMatch(/^[a-fA-F0-9]{32}$/);
+  const detailsUrl = `${jellyfinBaseUrl}web/#/details?id=${encodeURIComponent(episode.id)}&serverId=${encodeURIComponent(serverId!)}`;
   await page.goto(detailsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
