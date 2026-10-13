@@ -30,6 +30,10 @@ services:
       JELLYFIN_HLS_TIME: "${JELLYFIN_HLS_TIME:-}"
       JELLYFIN_OIDC_SECRET: "${JELLYFIN_OIDC_SECRET:?JELLYFIN_OIDC_SECRET is required}"
       SSL_CERT_FILE: "/ca/caddy-ca.crt"
+    # Native pasta containers must reach the broker host through its gateway,
+    # while preserving the public OIDC hostname, SNI and CA verification.
+    extraHosts:
+    - "keycloak.${DOMAIN}:host-gateway"
     networks:
       caddy: null
     volumes:
