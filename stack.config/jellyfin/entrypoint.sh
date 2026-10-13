@@ -1,6 +1,18 @@
 #!/bin/bash
 set -euo pipefail
 
+new_bootstrap_token() {
+    # Bounded producer: tr | head under pipefail exits 141 before provisioning.
+    od -An -N24 -tx1 /dev/urandom | tr -d ' \n'
+}
+
+escape_xml_text() {
+    local value="${1//&/\&amp;}"
+    value="${value//</\&lt;}"
+    value="${value//>/\&gt;}"
+    printf '%s' "$value"
+}
+
 escape_sed_replacement() {
     printf '%s' "$1" | sed 's/[&|\\]/\\&/g'
 }
@@ -229,7 +241,7 @@ bootstrap_default_media_library() {
         return 0
     fi
 
-    token="${token:-$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 48)}"
+    token="${token:-$(new_bootstrap_token)}"
     now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     sqlite3 "$database" <<SQL
 INSERT INTO ApiKeys (DateCreated, DateLastActivity, Name, AccessToken)
@@ -238,16 +250,16 @@ WHERE NOT EXISTS (SELECT 1 FROM ApiKeys WHERE Name = '$api_name');
 SQL
     token="$(sqlite3 "$database" "SELECT AccessToken FROM ApiKeys WHERE Name = '$api_name' LIMIT 1;")"
 
-    if curl -fsS -H "X-Emby-Token: $token" http://127.0.0.1:8096/Library/VirtualFolders \
+    if printf 'X-Emby-Token: %s\n' "$token" | curl -fsS -H @- http://127.0.0.1:8096/Library/VirtualFolders \
         | grep -F "\"Name\":\"$library_name\"" >/dev/null 2>&1; then
         echo "Jellyfin default library '$library_name' already exists"
         return 0
     fi
 
     status="$(
-        curl -sS -o /tmp/jellyfin-add-library.out -w '%{http_code}' \
+        printf 'X-Emby-Token: %s\n' "$token" | curl -sS -o /dev/null -w '%{http_code}' \
             -X POST \
-            -H "X-Emby-Token: $token" \
+            -H @- \
             -H "Content-Type: application/json" \
             "http://127.0.0.1:8096/Library/VirtualFolders?name=$(printf '%s' "$library_name" | sed 's/ /%20/g')&collectionType=$collection_type&paths=$library_path&refreshLibrary=false" \
             -d '{"LibraryOptions":{"Enabled":true,"EnablePhotos":true,"EnableRealtimeMonitor":false,"EnableInternetProviders":false}}' \
@@ -256,7 +268,7 @@ SQL
     if [ "$status" = "204" ]; then
         echo "Jellyfin default library '$library_name' points at $library_path"
     else
-        echo "Jellyfin default library bootstrap returned HTTP $status: $(cat /tmp/jellyfin-add-library.out 2>/dev/null || true)" >&2
+        echo "Jellyfin default library bootstrap returned HTTP $status" >&2
     fi
 }
 
@@ -315,13 +327,14 @@ if [ -f /config-templates/SSO-Auth.xml ]; then
 
     echo "Rendering SSO-Auth configuration..."
     domain_escaped="$(escape_sed_replacement "$DOMAIN")"
-    secret_escaped="$(escape_sed_replacement "$JELLYFIN_OIDC_SECRET")"
-    sed \
-        -e "s|{{DOMAIN}}|$domain_escaped|g" \
-        -e "s|{{JELLYFIN_OIDC_SECRET}}|$secret_escaped|g" \
-        /config-templates/SSO-Auth.xml \
-        > /config/plugins/configurations/SSO-Auth.xml
-    chmod 0644 /config/plugins/configurations/SSO-Auth.xml
+    secret_escaped="$(escape_sed_replacement "$(escape_xml_text "$JELLYFIN_OIDC_SECRET")")"
+    case "$JELLYFIN_OIDC_SECRET" in *$'\n'*|*$'\r'*) echo 'Jellyfin SSO secret must be a single line' >&2; exit 1 ;; esac
+    sso_target=/config/plugins/configurations/SSO-Auth.xml
+    [ ! -L "$sso_target" ] || { echo 'Jellyfin SSO configuration symlink refused' >&2; exit 1; }
+    # Builtin printf feeds the private sed program through stdin, never argv.
+    (umask 077; : >> "$sso_target"; chmod 0600 "$sso_target"; printf 's|{{DOMAIN}}|%s|g\ns|{{JELLYFIN_OIDC_SECRET}}|%s|g\n' "$domain_escaped" "$secret_escaped" \
+        | sed -f - /config-templates/SSO-Auth.xml > "$sso_target")
+    chmod 0600 "$sso_target"
     echo "SSO-Auth configuration rendered"
 fi
 unset JELLYFIN_OIDC_SECRET secret_escaped
