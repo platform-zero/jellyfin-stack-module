@@ -28,7 +28,9 @@ class BootstrapPrivacy(unittest.TestCase):
  def test_multiline_secret_refused_privately(self):
   secret='fixture-private\nsecondline';r,text,mode,outside,script=self.render(secret);self.assertNotEqual(r.returncode,0);self.assertNotIn(secret,r.stdout+r.stderr);self.assertEqual(text,'old-render')
  def test_curl_private_header_and_error_body_not_emitted(self):
-  self.assertNotIn('-H "X-Emby-Token: $token"',SOURCE);self.assertEqual(SOURCE.count('X-Emby-Token: %s'),2);self.assertNotIn('/tmp/jellyfin-add-library.out',SOURCE)
+  self.assertNotIn('-H "X-Emby-Token: $token"',SOURCE);self.assertEqual(SOURCE.count('X-Emby-Token: %s'),3);self.assertNotIn('/tmp/jellyfin-add-library.out',SOURCE)
+ def test_native_admin_readiness_wait_is_bounded_and_does_not_replace_token(self):
+  self.assertIn('case "$status" in 000|401|503)',SOURCE);self.assertIn('Jellyfin native library readiness deadline elapsed',SOURCE);self.assertIn('for _ in $(seq 1 120)',SOURCE)
  def test_initialized_token_is_preserved(self):
   self.assertIn('WHERE NOT EXISTS (SELECT 1 FROM ApiKeys WHERE Name',SOURCE);self.assertIn('SELECT AccessToken FROM ApiKeys WHERE Name',SOURCE);self.assertNotIn('UPDATE ApiKeys',SOURCE)
 if __name__=='__main__':unittest.main()

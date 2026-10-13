@@ -250,6 +250,16 @@ WHERE NOT EXISTS (SELECT 1 FROM ApiKeys WHERE Name = '$api_name');
 SQL
     token="$(sqlite3 "$database" "SELECT AccessToken FROM ApiKeys WHERE Name = '$api_name' LIMIT 1;")"
 
+    # Public health becomes ready before native library administration (503).
+    # Wait with this exact persisted token; never rotate it to manufacture readiness.
+    for _ in $(seq 1 120); do
+        status="$(printf 'X-Emby-Token: %s\n' "$token" | curl -sS -o /dev/null -w '%{http_code}' \
+            -H @- http://127.0.0.1:8096/Library/VirtualFolders || true)"
+        [ "$status" = "200" ] && break
+        case "$status" in 000|401|503) sleep 1 ;; *) echo "Jellyfin library readiness rejected HTTP $status" >&2; return 1 ;; esac
+    done
+    [ "$status" = "200" ] || { echo 'Jellyfin native library readiness deadline elapsed' >&2; return 1; }
+
     if printf 'X-Emby-Token: %s\n' "$token" | curl -fsS -H @- http://127.0.0.1:8096/Library/VirtualFolders \
         | grep -F "\"Name\":\"$library_name\"" >/dev/null 2>&1; then
         echo "Jellyfin default library '$library_name' already exists"
