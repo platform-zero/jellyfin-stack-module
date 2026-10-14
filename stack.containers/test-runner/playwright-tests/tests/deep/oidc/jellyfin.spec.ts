@@ -503,6 +503,22 @@ test('Jellyfin - OIDC login streams Simpsons video with visible frames', async (
     throw error;
   });
 
+  // The preserved source opens with a cross-series montage. A decoded frame
+  // at the first few seconds proves transport but not the named episode;
+  // verify native player seek and capture a later frame from that same stream.
+  await page.evaluate(() => {
+    const video = document.querySelector('video') as HTMLVideoElement | null;
+    if (!video) throw new Error('Jellyfin video detached before the playback seek');
+    video.currentTime = 120;
+  });
+  await expect.poll(async () => page.evaluate(() => {
+    const video = document.querySelector('video') as HTMLVideoElement | null;
+    return video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA ? video.currentTime : 0;
+  }), { message: 'Jellyfin original episode should seek and continue decoding', timeout: 45000 }).toBeGreaterThan(119);
+  await page.waitForTimeout(1000);
+  const seekedMetrics = await waitForVisibleVideo(page);
+  expect(seekedMetrics.currentTime, 'Jellyfin should display frames after the real-media seek').toBeGreaterThan(119);
+
   fs.mkdirSync(moduleScreenshotRoot, { recursive: true });
   fs.writeFileSync(path.join(moduleScreenshotRoot, 'jellyfin-video-playback.jpg'), await captureVideoFrame(page));
 
