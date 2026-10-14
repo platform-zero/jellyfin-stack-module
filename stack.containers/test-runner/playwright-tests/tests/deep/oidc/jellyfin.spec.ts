@@ -154,11 +154,15 @@ async function findSimpsonsEpisode(page: Page, session: JellyfinSession): Promis
       }>;
     };
     const items = payload.Items ?? [];
+    // The original, hash-verified S25E21 is the contract fixture. The
+    // container also has other search hits with misleading Simpsons metadata;
+    // choosing the first series/season hit once rendered unrelated footage.
+    // Select the actual episode rather than accepting any labelled media.
     const preferred = items.find((item) =>
       item.Id
       && /simpsons/i.test([item.SeriesName, item.Name, item.Path].filter(Boolean).join(' '))
-      && (item.ParentIndexNumber === 1 || /season 0?1/i.test([item.SeasonName, item.Path].filter(Boolean).join(' ')))
-    ) ?? items.find((item) => item.Id && /simpsons/i.test([item.SeriesName, item.Name, item.Path].filter(Boolean).join(' ')));
+      && /S25E21/i.test([item.Name, item.Path].filter(Boolean).join(' '))
+    );
 
     if (!preferred?.Id) {
       return {
